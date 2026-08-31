@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SiteSurvey Pro - Infraestructura & CAO</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #092c4d;
+      --secondary: #28a745;
+      --accent: #f59e0b;
+      --bg: #f3f5f9;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --border: #d1d5db;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; min-height: 100vh; }
+    
+    /* Login Screen */
+    #login-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #092c4d 0%, #0f4c81 60%, #1e3a8a 100%);
+      display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 1rem;
+    }
+    .login-box {
+      background: #ffffff; width: 100%; max-width: 420px; border-radius: 12px;
+      padding: 2.2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .login-box h2 { font-size: 1.4rem; color: var(--primary-dark); margin-bottom: 0.5rem; text-align: center; }
+    .login-box p { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-bottom: 1.5rem; }
+    .auth-alert { padding: 0.6rem; border-radius: 4px; font-size: 0.82rem; margin-bottom: 1rem; display: none; }
+    .auth-alert.error { background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; display: block; }
+    .auth-alert.info { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; display: block; }
+
+    /* App Header */
+    header { background: var(--primary); color: #fff; padding: 0.75rem 1rem; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center; }
+    header .brand { display: flex; flex-direction: column; }
+    header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.3px; }
+    .user-badge { font-size: 0.75rem; color: #bfdbfe; display: flex; align-items: center; gap: 6px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    
+    .nav-tabs { display: flex; overflow-x: auto; background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 52px; z-index: 99; }
+    .nav-tab { flex: 1; min-width: 105px; text-align: center; padding: 11px 6px; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: all 0.2s; }
+    .nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #f0f7ff; }
+
+    .container { max-width: 960px; margin: 1rem auto; padding: 0 0.8rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card { background: var(--surface); border-radius: 8px; padding: 1.2rem; margin-bottom: 1.2rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .card h2 { font-size: 1.05rem; color: var(--primary-dark); margin-bottom: 0.9rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: center; }
+    
+    .form-group { margin-bottom: 0.9rem; }
+    label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; color: #374151; }
+    input, select, textarea { width: 100%; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 5px; font-size: 0.88rem; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(15,76,129,0.15); }
+    input[readonly] { background: #f9fafb; color: #4b5563; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    @media (max-width: 650px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.55rem 0.9rem; font-size: 0.85rem; font-weight: 600; border-radius: 5px; border: none; cursor: pointer; text-decoration: none; transition: 0.15s; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: #4b5563; color: white; }
+    .btn-success { background: var(--secondary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; }
+    .btn-block { width: 100%; margin-top: 0.4rem; }
+
+    /* Plano Interactivo */
+    .canvas-container { position: relative; width: 100%; border: 2px dashed var(--border); border-radius: 6px; overflow: hidden; background: #e5e7eb; min-height: 240px; display: flex; justify-content: center; align-items: center; cursor: crosshair; }
+    .canvas-container img { max-width: 100%; display: block; user-select: none; }
+    .pin { position: absolute; width: 24px; height: 24px; background: var(--danger); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 10.5px; font-weight: bold; transform: translate(-50%, -50%); box-shadow: 0 2px 4px rgba(0,0,0,0.35); border: 2px solid white; cursor: pointer; }
+
+    /* Tablas */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 0.5rem; }
+    .data-table th, .data-table td { border: 1px solid var(--border); padding: 7px 9px; text-align: left; }
+    .data-table th { background: #f9fafb; font-weight: 600; color: #374151; }
+    
+    .media-preview-container { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 0.5rem; }
+    .media-preview { width: 68px; height: 68px; border-radius: 4px; object-fit: cover; border: 1px solid var(--border); }
+
+    /* Bitácora de Auditoría */
+    .audit-box { background: #f8fafc; border: 1px dashed var(--primary); padding: 0.8rem; border-radius: 6px; font-size: 0.8rem; margin-top: 0.8rem; }
+    .audit-box span { color: var(--primary-dark); font-weight: bold; }
+
+    /* Formato CAO para Impresión / PDF */
+    @media print {
+      body { padding: 0; background: white; font-size: 9pt; }
+      #login-overlay, header, .nav-tabs, .btn, .no-print { display: none !important; }
+      .tab-content { display: block !important; margin-bottom: 1.2rem; }
+      .card { border: 1px solid #999; box-shadow: none; page-break-inside: avoid; margin-bottom: 0.8rem; padding: 0.8rem; }
+      .canvas-container { border: 1px solid #333; }
+      .print-header { display: block !important; border-bottom: 2px solid #0f4c81; padding-bottom: 8px; margin-bottom: 15px; }
+      .audit-box { background: #fff; border: 1px solid #000; }
+    }
+    .print-header { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- MODAL DE LOGIN / ACCESO RESTRINGIDO -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2>SiteSurvey Pro</h2>
+      <p>Control de Acceso Técnico & Relevamiento CAO</p>
+      
+      <div id="auth-alert" class="auth-alert"></div>
+
+      <div class="form-group">
+        <label>Usuario / Legajo</label>
+        <input type="text" id="login-user" placeholder="Ej: tecnico1 o admin" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      
+      <button class="btn btn-primary btn-block" onclick="authenticateUser()">Iniciar Sesión</button>
+
+      <div style="margin-top: 1.2rem; font-size: 0.75rem; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 0.8rem;">
+        <strong>Credenciales demo:</strong><br>
+        • Usuario: <code>admin</code> / Clave: <code>admin123</code> (Admin / Inspector)<br>
+        • Usuario: <code>tecnico1</code> / Clave: <code>redes2024</code> (Técnico de Campo)
+      </div>
+    </div>
+  </div>
+
+  <!-- CABECERA DE LA APP -->
+  <header>
+    <div class="brand">
+      <h1>SiteSurvey Pro: Redes, Fibra & Tableros</h1>
+      <div class="user-badge" id="user-display">Sesión: No iniciada</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-sm btn-success no-print" onclick="window.print()">Exportar CAO / PDF</button>
+      <button class="btn btn-sm btn-danger no-print" onclick="logoutUser()">Salir</button>
+    </div>
+  </header>
+
+  <!-- PESTAÑAS DE NAVEGACIÓN -->
+  <div class="nav-tabs no-print">
+    <div class="nav-tab active" onclick="switchTab(event, 'tab-sitio')">1. Sitio & Acometida</div>
+    <div class="nav-tab" onclick="switchTab(event, 'tab-red')">2. Puestos Red (UTP)</div>
+    <div class="nav-tab" onclick="switchTab(event, 'tab-fo')">3. Fibra Óptica</div>
+    <div class="nav-tab" onclick="switchTab(event, 'tab-energia')">4. Tableros & PAT</div>
+    <div class="nav-tab" onclick="switchTab(event, 'tab-presupuesto')">5. Cómputo & Presupuesto</div>
+  </div>
+
+  <div class="container">
+    
+    <!-- ENCABEZADO FORMAL PARA PDF / IMPRESIÓN -->
+    <div class="print-header">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="color:#0f4c81; font-size:1.4rem;">INFORME DE RELEVAMIENTO TÉCNICO / CAO</h2>
+          <div style="font-size:0.85rem; color:#444;" id="print-subhead">PROYECTO: SANTA FE + CONECTADA</div>
+        </div>
+        <div style="text-align:right; font-size:0.8rem; color:#555;" id="print-metadata">
+          <!-- Dinámico -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: DATOS DEL SITIO -->
+    <div id="tab-sitio" class="tab-content active">
+      <div class="card">
+        <h2>Identificación de Obra & Auditoría de Usuario</h2>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Proyecto / Contrato</label>
+            <input type="text" id="site-project" value="SANTA FE + CONECTADA">
+          </div>
+          <div class="form-group">
+            <label>Nombre del Nodo / Sitio</label>
+            <input type="text" id="site-name" value="NODO SAN JOSÉ DEL RINCÓN" placeholder="Ej: Nodo EPI Rincón">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Tipo de Sitio / Infraestructura</label>
+            <select id="site-type">
+              <option>Gabinete Exterior Tipo 3 (40U Outdoor)</option>
+              <option>Gabinete Exterior Tipo 4</option>
+              <option>Sala Data Center / Racks Indoor</option>
+              <option>Oficinas / Puestos de Trabajo Corporativos</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Contratista / Empresa Ejecutora</label>
+            <input type="text" id="site-contractor" value="TRANS INDUSTRIAS ELECTRÓNICAS S.A">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Coordenadas GPS (Latitud, Longitud)</label>
+            <input type="text" id="site-coords" value="31°35'24.93''S 60°33'52.33''W" placeholder="Lat, Long">
+          </div>
+          <div class="form-group" style="align-self: flex-end;">
+            <button class="btn btn-secondary btn-block no-print" onclick="getGPSLocation()">📍 Obtener Coordenadas GPS</button>
+          </div>
+        </div>
+
+        <!-- Trazabilidad del Relevador -->
+        <div class="audit-box">
+          <div>👤 <strong>Técnico Responsable:</strong> <span id="audit-tech-name">-</span> | <strong>Rol:</strong> <span id="audit-tech-role">-</span></div>
+          <div style="margin-top:4px;">🕒 <strong>Fecha y Hora de Relevamiento:</strong> <span id="audit-timestamp">-</span></div>
+          <div style="margin-top:4px;">🔒 <strong>Firma Digital de Sesión:</strong> <span id="audit-token" style="font-family:monospace;">-</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Registro Fotográfico de Implantación (Panorámica & Cerramiento)</h2>
+        <div class="form-group">
+          <label>Fotos Generales del Sitio (Platea, Pilar, Portón, Cerco Perimetral)</label>
+          <input type="file" accept="image/*" multiple onchange="handleMediaUpload(this, 'site-photos-container')">
+          <div class="media-preview-container" id="site-photos-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: PUESTOS DE TRABAJO ETHERNET -->
+    <div id="tab-red" class="tab-content">
+      <div class="card">
+        <h2>Plano de Puestos de Red & Marcación Interactiva</h2>
+        <p style="font-size: 0.82rem; color: #666; margin-bottom: 0.6rem;">
+          Cargue la imagen del plano o croquis. Haga clic sobre el plano para posicionar cada puesto de trabajo (UTP / Telefonía / WiFi).
+        </p>
+        <div class="form-group no-print">
+          <input type="file" accept="image/*" onchange="loadFloorPlan(this)">
+        </div>
+        <div class="canvas-container" id="canvas-container" onclick="handleCanvasClick(event)">
+          <span id="canvas-placeholder" style="color: #888;">Haga clic aquí tras subir el plano para fijar puestos</span>
+          <img id="floor-plan-img" style="display: none;" alt="Plano de Puestos">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Listado de Puestos de Red Registrados</h2>
+        <table class="data-table" id="table-puestos">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Ubicación / Sector</th>
+              <th>Categoría / Vaina</th>
+              <th>Canalización</th>
+              <th>Dist. Rack</th>
+              <th>Fotos / Video</th>
+              <th class="no-print">Acción</th>
+            </tr>
+          </thead>
+          <tbody><!-- Dinámico --></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: FIBRA ÓPTICA -->
+    <div id="tab-fo" class="tab-content">
+      <div class="card">
+        <h2>Relevamiento de FO Troncal, Acometidas & Empalmes</h2>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Tipo de Tendido de FO</label>
+            <select id="fo-type">
+              <option>Subterráneo Tritubo / Cámaras de Paso</option>
+              <option>Aéreo Autosoportado (ADSS en Posteado)</option>
+              <option>Drop F8 Mini para Acometida</option>
+              <option>Canalizado Interno por Bandeja</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Capacidad del Cable (Hilos)</label>
+            <select id="fo-fibers">
+              <option value="12">12 Hilos</option>
+              <option value="24">24 Hilos</option>
+              <option value="48">48 Hilos</option>
+              <option value="96" selected>96 Hilos (48H G.652D + 48H G.655)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Longitud de la Traza Estimada (metros)</label>
+            <input type="number" id="fo-distance" value="180" onchange="calculateBudget()">
+          </div>
+          <div class="form-group">
+            <label>Tipo de Conectores & ODF</label>
+            <select id="fo-connectors">
+              <option>Cuplas EU2000 / E2000 APC</option>
+              <option>SC-APC (Módulo 24/48 puertos)</option>
+              <option>LC-UPC Dúplex</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Cajas de Empalme Troncal / Derivación</label>
+            <input type="number" id="fo-boxes" value="2" onchange="calculateBudget()">
+          </div>
+          <div class="form-group">
+            <label>Fusiones de Fibra a Realizar</label>
+            <input type="number" id="fo-splices" value="96" onchange="calculateBudget()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Fotos de Trazas, Tritubo, Cámaras y Cajas de Empalme</label>
+          <input type="file" accept="image/*,video/*" multiple onchange="handleMediaUpload(this, 'fo-photos-container')">
+          <div class="media-preview-container" id="fo-photos-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: ENERGÍA, TABLEROS & PAT -->
+    <div id="tab-energia" class="tab-content">
+      <div class="card">
+        <h2>Acometida Eléctrica, Tablero AC & Grupo Electrógeno</h2>
+        <div class="grid-3">
+          <div class="form-group">
+            <label>Acometida Eléctrica</label>
+            <select id="power-in">
+              <option>Monofásica 220V 50Hz (Compañía EPE)</option>
+              <option>Trifásica 380V 50Hz</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ITM General AC</label>
+            <input type="text" id="power-itm" value="63A Bipolar Curva C">
+          </div>
+          <div class="form-group">
+            <label>Protector Atmosférico (SPD)</label>
+            <input type="text" id="power-spd" value="SPD 40kA Clase II">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Grupo Electrógeno (GE)</label>
+            <input type="text" id="power-ge" value="KIPOR KDE6500T (5kVA)">
+          </div>
+          <div class="form-group">
+            <label>Tablero Transferencia Automática (TTA)</label>
+            <input type="text" id="power-tta" value="TTA D-500 Conmutación Automática">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sistema DC, Rectificadores & Puesta a Tierra (PAT)</h2>
+        <div class="grid-3">
+          <div class="form-group">
+            <label>Sistema Rectificador</label>
+            <input type="text" id="dc-rectifier" value="E4860 Switching Power Supply (54 VDC)">
+          </div>
+          <div class="form-group">
+            <label>Banco de Baterías</label>
+            <input type="text" id="dc-bat" value="SHOTO 6-GFM-40 (120 Ah)">
+          </div>
+          <div class="form-group">
+            <label>Medición Telurímetro PAT</label>
+            <input type="text" id="dc-pat" value="3.80 Ω (< 10 Ω Conforme)">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Fotos de Tableros, Rectificador, Baterías, Jabalinas y Vinculación PAT</label>
+          <input type="file" accept="image/*" multiple onchange="handleMediaUpload(this, 'power-photos-container')">
+          <div class="media-preview-container" id="power-photos-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: CÓMPUTO & PRESUPUESTO -->
+    <div id="tab-presupuesto" class="tab-content">
+      <div class="card">
+        <h2>Cómputo Automático de Materiales (BOM)</h2>
+        <table class="data-table" id="table-bom">
+          <thead>
+            <tr>
+              <th>Ítem / Material</th>
+              <th>Cantidad</th>
+              <th>Unidad</th>
+              <th>Precio Unit. (USD)</th>
+              <th>Subtotal (USD)</th>
+            </tr>
+          </thead>
+          <tbody><!-- Dinámico --></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Resumen Económico & Presupuesto</h2>
+        <div class="grid-2">
+          <div>
+            <div class="form-group">
+              <label>Mano de Obra Especializada (USD)</label>
+              <input type="number" id="cost-mo" value="1450" onchange="calculateBudget()">
+            </div>
+            <div class="form-group">
+              <label>Margen Comercial e Imprevistos (%)</label>
+              <input type="number" id="cost-margin" value="15" onchange="calculateBudget()">
+            </div>
+          </div>
+          <div style="background: #eef4fc; padding: 1.2rem; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; border: 1px solid #bfdbfe;">
+            <div style="font-size: 0.88rem; color: #4b5563;">Total Materiales: <strong id="lbl-mat-total">$0</strong></div>
+            <div style="font-size: 0.88rem; color: #4b5563; margin: 0.4rem 0;">Mano de Obra: <strong id="lbl-mo-total">$0</strong></div>
+            <div style="font-size: 1.25rem; color: var(--primary); font-weight: bold;">Presupuesto Total: <span id="lbl-grand-total">$0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Base de datos de Usuarios Autorizados (Simulación de Directorio / Auth)
+    const USERS_DB = [
+      { user: "admin", pass: "admin123", name: "Ing. Carlos Mendoza", role: "Inspector de Obra / Jefe Técnico" },
+      { user: "tecnico1", pass: "redes2024", name: "Pablo Gómez", role: "Técnico Especialista en Conectividad" },
+      { user: "instalador2", pass: "fibra2024", name: "Esteban Rossi", role: "Oficial Instalador FO & Redes" }
+    ];
+
+    let currentUser = null;
+    let currentSessionToken = null;
+    let floorPlanDataUrl = null;
+    let puestosList = [];
+
+    // Precios Unitarios Referenciales
+    const UNIT_PRICES = {
+      utpCableMeter: 0.95,
+      jackRJ45: 4.80,
+      faceplate: 3.50,
+      patchCord1m: 3.20,
+      patchCord3m: 4.60,
+      patchPanel24: 90.00,
+      canalizacionMeter: 6.20,
+      foCableMeter: 2.30,
+      foFusion: 12.00,
+      foBox: 80.00,
+      odfModule: 160.00
+    };
+
+    // Autenticación de Usuario
+    function authenticateUser() {
+      const uInput = document.getElementById('login-user').value.trim();
+      const pInput = document.getElementById('login-pass').value.trim();
+      const alertBox = document.getElementById('auth-alert');
+
+      const found = USERS_DB.find(u => u.user.toLowerCase() === uInput.toLowerCase() && u.pass === pInput);
+
+      if (found) {
+        currentUser = found;
+        currentSessionToken = 'AUTH-' + Math.random().toString(36).substring(2, 9).toUpperCase() + '-' + Date.now().toString().slice(-4);
+        
+        // Guardar datos en la sesión
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('user-display').innerHTML = `👤 ${currentUser.name} (${currentUser.role})`;
+        
+        // Cargar trazabilidad de auditoría
+        const now = new Date();
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+        document.getElementById('audit-tech-name').innerText = `${currentUser.name} (${currentUser.user})`;
+        document.getElementById('audit-tech-role').innerText = currentUser.role;
+        document.getElementById('audit-timestamp').innerText = dateStr;
+        document.getElementById('audit-token').innerText = currentSessionToken;
+
+        // Metadatos de impresión
+        document.getElementById('print-metadata').innerHTML = `
+          <strong>Auditor:</strong> ${currentUser.name}<br>
+          <strong>Fecha:</strong> ${dateStr}<br>
+          <strong>Token Sesión:</strong> ${currentSessionToken}
+        `;
+
+        calculateBudget();
+      } else {
+        alertBox.className = 'auth-alert error';
+        alertBox.innerText = 'Usuario o contraseña incorrectos. Verifique sus credenciales.';
+      }
+    }
+
+    function logoutUser() {
+      if (confirm("¿Está seguro de que desea cerrar la sesión actual?")) {
+        currentUser = null;
+        currentSessionToken = null;
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('login-pass').value = '';
+        document.getElementById('auth-alert').className = 'auth-alert';
+        document.getElementById('auth-alert').innerText = '';
+        document.getElementById('user-display').innerText = 'Sesión: No iniciada';
+      }
+    }
+
+    function switchTab(event, tabId) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+      if (tabId === 'tab-presupuesto') calculateBudget();
+    }
+
+    function getGPSLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            document.getElementById('site-coords').value = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (Precisión: ±${pos.coords.accuracy}m)`;
+          },
+          err => alert("No se pudo obtener el GPS: " + err.message)
+        );
+      } else {
+        alert("Geolocalización no soportada en este navegador.");
+      }
+    }
+
+    // Plano Interactivo
+    function loadFloorPlan(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          floorPlanDataUrl = e.target.result;
+          const img = document.getElementById('floor-plan-img');
+          img.src = floorPlanDataUrl;
+          img.style.display = 'block';
+          document.getElementById('canvas-placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function handleCanvasClick(event) {
+      if (!floorPlanDataUrl) {
+        alert("Primero suba una imagen de plano.");
+        return;
+      }
+      const container = document.getElementById('canvas-container');
+      const rect = container.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+      const ptoId = `PTO-${(puestosList.length + 1).toString().padStart(2, '0')}`;
+      const area = prompt(`Nombre / Ubicación para ${ptoId}:`, `Puesto de Trabajo ${puestosList.length + 1}`);
+      if (!area) return;
+
+      const dist = prompt(`Distancia estimada al Rack (metros):`, "20");
+      const distance = parseFloat(dist) || 20;
+
+      const newPuesto = {
+        id: ptoId,
+        x: x.toFixed(2),
+        y: y.toFixed(2),
+        area: area,
+        cat: "Cat 6 UTP LSZH",
+        canal: "Cablecanal 100x50",
+        dist: distance
+      };
+
+      puestosList.push(newPuesto);
+      renderPins();
+      renderPuestosTable();
+      calculateBudget();
+    }
+
+    function renderPins() {
+      const container = document.getElementById('canvas-container');
+      container.querySelectorAll('.pin').forEach(p => p.remove());
+      puestosList.forEach(p => {
+        const pin = document.createElement('div');
+        pin.className = 'pin';
+        pin.style.left = `${p.x}%`;
+        pin.style.top = `${p.y}%`;
+        pin.innerText = p.id.replace('PTO-', '');
+        pin.title = `${p.id}: ${p.area} (${p.dist}m)`;
+        container.appendChild(pin);
+      });
+    }
+
+    function renderPuestosTable() {
+      const tbody = document.querySelector('#table-puestos tbody');
+      tbody.innerHTML = '';
+      puestosList.forEach((p, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${p.id}</strong></td>
+          <td>${p.area}</td>
+          <td>${p.cat}</td>
+          <td>${p.canal}</td>
+          <td>${p.dist} m</td>
+          <td><input type="file" accept="image/*,video/*" capture="environment" style="font-size:0.75rem; width:135px;"></td>
+          <td class="no-print"><button class="btn btn-danger btn-sm" onclick="removePuesto(${idx})">Eliminar</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function removePuesto(index) {
+      puestosList.splice(index, 1);
+      renderPins();
+      renderPuestosTable();
+      calculateBudget();
+    }
+
+    function handleMediaUpload(input, containerId) {
+      const container = document.getElementById(containerId);
+      if (input.files) {
+        Array.from(input.files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = e => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'media-preview';
+            container.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    // Cálculo Económico y Materiales
+    function calculateBudget() {
+      const totalPuestos = puestosList.length;
+      let totalMtsUTP = 0;
+      puestosList.forEach(p => totalMtsUTP += (p.dist * 1.15) + 3);
+
+      const patchPanelsCount = Math.ceil(totalPuestos / 24) || 0;
+      const totalCanalizacion = Math.round(puestosList.reduce((acc, p) => acc + (p.dist * 0.6), 0));
+
+      const foDist = parseFloat(document.getElementById('fo-distance')?.value) || 0;
+      const foSplices = parseInt(document.getElementById('fo-splices')?.value) || 0;
+      const foBoxes = parseInt(document.getElementById('fo-boxes')?.value) || 0;
+
+      const bomItems = [
+        { name: "Cable UTP Cat 6 LSZH Bobina (Metros)", qty: Math.round(totalMtsUTP), unit: "m", price: UNIT_PRICES.utpCableMeter },
+        { name: "Jack RJ45 Hembra Cat 6", qty: totalPuestos, unit: "un", price: UNIT_PRICES.jackRJ45 },
+        { name: "Faceplate 2 bocas c/bastidor", qty: Math.ceil(totalPuestos / 2), unit: "un", price: UNIT_PRICES.faceplate },
+        { name: "Patch Cord UTP 1m (Rack)", qty: totalPuestos, unit: "un", price: UNIT_PRICES.patchCord1m },
+        { name: "Patch Cord UTP 3m (Puesto)", qty: totalPuestos, unit: "un", price: UNIT_PRICES.patchCord3m },
+        { name: "Patch Panel Modular 24 bocas Cat 6", qty: patchPanelsCount, unit: "un", price: UNIT_PRICES.patchPanel24 },
+        { name: "Canalización / Cablecanal c/accesorios (m)", qty: totalCanalizacion, unit: "m", price: UNIT_PRICES.canalizacionMeter },
+        { name: "Cable Fibra Óptica 96 FO (m)", qty: Math.round(foDist * 1.15), unit: "m", price: UNIT_PRICES.foCableMeter },
+        { name: "Empalmes por Fusión de Fibra Óptica", qty: foSplices, unit: "fus", price: UNIT_PRICES.foFusion },
+        { name: "Caja de Empalme Troncal / Derivación", qty: foBoxes, unit: "un", price: UNIT_PRICES.foBox },
+        { name: "Distribuidor ODF / Bandeja c/acopladores", qty: 2, unit: "un", price: UNIT_PRICES.odfModule }
+      ];
+
+      const tbody = document.querySelector('#table-bom tbody');
+      tbody.innerHTML = '';
+      let totalMateriales = 0;
+
+      bomItems.forEach(item => {
+        const subtotal = item.qty * item.price;
+        totalMateriales += subtotal;
+        if (item.qty > 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.qty}</td>
+            <td>${item.unit}</td>
+            <td>$${item.price.toFixed(2)}</td>
+            <td>$${subtotal.toFixed(2)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      });
+
+      const manoObra = parseFloat(document.getElementById('cost-mo').value) || 0;
+      const margenPorc = parseFloat(document.getElementById('cost-margin').value) || 0;
+      const subtotalGeneral = totalMateriales + manoObra;
+      const grandTotal = subtotalGeneral * (1 + (margenPorc / 100));
+
+      document.getElementById('lbl-mat-total').innerText = `$${totalMateriales.toFixed(2)}`;
+      document.getElementById('lbl-mo-total').innerText = `$${manoObra.toFixed(2)}`;
+      document.getElementById('lbl-grand-total').innerText = `$${grandTotal.toFixed(2)} USD`;
+    }
+  </script>
+</body>
+</html>
