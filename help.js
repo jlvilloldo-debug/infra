@@ -18,6 +18,7 @@ const HELP = [
     ['Asignar la ticketera a un proyecto', 'Proyecto → pestaña "Contrato y SLA" → Ticketera.'],
     ['Mandar una nota al NOC', 'Abrí el ticket → "Nota al NOC": arma el mail con el asunto correcto para que el NOC lo tome.']] },
   { id: 'tareas', ic: '📋', t: 'Tareas', hash: ['#/tasks', '/ta'], d: 'Cada tarea pertenece a un proyecto. Las que no tienen proyecto van a Infraestructura.', q: [
+    ['Ver recursos y guardias de un proyecto', 'Proyecto → pestaña "📆 Calendario": quién está de guardia hoy y mañana, la grilla de guardias solo de los recursos asignados (🏗 Equipo), el resumen del período y "Bajar Excel". Para subir un Excel de guardias, usá "Importar Excel" de esa misma pestaña (solo carga a las personas del proyecto). El calendario general sigue en Agenda.'],
     ['Asignar una tarea', 'Proyecto → "📋 Asignar tarea" (o pestaña Tareas → "+ Nueva tarea"). Queda en ese proyecto.'],
     ['Tarea para todos los sitios del proyecto', 'En la tarea → "+ Todos los sitios del proyecto" (útil para preventivos).'],
     ['Pasar las tareas sin proyecto a Infraestructura', 'Creá el proyecto "Infraestructura" y entrá: aparece "Hay N tareas sin proyecto → Pasarlas acá".']] },

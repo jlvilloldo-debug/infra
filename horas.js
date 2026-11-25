@@ -336,12 +336,22 @@ async function hhViewResumen(body, D0, def, title, per){
   $('#hs-ok')?.addEventListener('click', async () => { if (await hhRepMarkSent(key)) toast('Marcado como presentado'); HHS.gb = null; hhViewReport(body); });
 }
 /* La misma planilla que se presenta cada mes: título, Obras / fecha, un renglón verde por técnico */
+const hhSerial = d => Math.round(hhXDate(d).getTime() / 86400000) + 25569;   // fecha de Excel (número de serie)
+const hhX = s => typeof s === 'string' && /^[=+\-@\t\r]/.test(s) ? "'" + s : s;   // sin fórmulas escondidas
 async function hhExportResumen(D0, def, title){
   await hhLoadExcelJS();
-  const D = { ...D0, rows: D0.rows.filter(r => r.nodata < D0.days.length) };      // solo quienes tienen guardias cargadas
-  const X = s => typeof s === 'string' && /^[=+\-@\t\r]/.test(s) ? "'" + s : s;   // sin fórmulas escondidas
   const wb = new ExcelJS.Workbook(); wb.creator = 'InspectApp'; wb.created = new Date();
-  const ws = wb.addWorksheet(`${HH_MONTHS[def.m - 1].toUpperCase()} ${String(def.y).slice(2)}`, { views: [{ showGridLines: false }], pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, paperSize: 9 } });
+  hhResumenSheet(wb, D0, def, `${HH_MONTHS[def.m - 1].toUpperCase()} ${String(def.y).slice(2)}`);
+  hhDownloadWb(await wb.xlsx.writeBuffer(), `Guardias RRHH - ${title}.xlsx`);
+}
+function hhDownloadWb(buf, name){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = name.replace(/[\\/:*?"<>|]/g, ''); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+function hhResumenSheet(wb, D0, def, sheetName){
+  const D = { ...D0, rows: D0.rows.filter(r => r.nodata < D0.days.length) };      // solo quienes tienen guardias cargadas
+  const X = hhX;
+  const ws = wb.addWorksheet(sheetName, { views: [{ showGridLines: false }], pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, paperSize: 9 } });
   ws.columns = [{ width: 2 }, { width: 30 }, { width: 34 }, { width: 38 }];
   const GN = 'FF92D050', th = { style: 'thin', color: { argb: 'FF000000' } }, md = { style: 'medium', color: { argb: 'FF000000' } };
   const last = 6 + Math.max(D.rows.length, 1);
@@ -357,9 +367,6 @@ async function hhExportResumen(D0, def, title){
   ws.mergeCells('B3:D3'); ws.mergeCells('C5:C6'); ws.mergeCells('D5:D6');
   D.rows.forEach((r, i) => { const n = 7 + i; put(n, 2, X(r.s.name), { b: 1 }); put(n, 3, r.gd, { b: 1, f: GN }); put(n, 4, r.gw, { b: 1, f: GN }); ws.getRow(n).height = 18; });
   ws.getRow(3).height = 20; ws.getRow(5).height = 20; ws.getRow(6).height = 20;
-  const buf = await wb.xlsx.writeBuffer();
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-  a.download = `Guardias RRHH - ${title}.xlsx`.replace(/[\\/:*?"<>|]/g, ''); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 
 /* =====================================================================
@@ -666,12 +673,12 @@ function hhPoll(fn, el){
 /* =====================================================================
    GUARDIAS
    ===================================================================== */
-async function hhViewGuards(body, per){
+async function hhViewGuards(body, per, opt){
   const mgr = isManager() && canWrite();
   const cp = hhCurPeriod(); per = per || HHS.gper || { ...hhPeriod(cp.y, cp.m), y: cp.y, m: cp.m }; HHS.gper = per;
   const list = mgr || isManager() ? HHS.staff.filter(s => s.active) : [HHS.mine].filter(Boolean);
   const flt = HHS.gflt || 'tecnico';
-  const cols = isManager() ? list.filter(s => flt === 'todos' || s.kind === flt || (flt === 'otros' && s.kind !== 'tecnico')) : list;
+  const cols = opt ? list.filter(s => opt.ids.has(s.id)) : isManager() ? list.filter(s => flt === 'todos' || s.kind === flt || (flt === 'otros' && s.kind !== 'tecnico')) : list;
   const rows = await cached(`hh-g-${per.from}`, () => sb.from('hh_guard').select('staff_id,day,code,note').gte('day', per.from).lte('day', per.to).limit(20000));
   const G = new Map(rows.map(r => [r.staff_id + '|' + r.day, r]));
   const days = hhDays(per.from, per.to);
@@ -681,7 +688,7 @@ async function hhViewGuards(body, per){
         <select id="hg-m" style="width:auto">${HH_MONTHS.map((n, i) => `<option value="${i + 1}" ${i + 1 === per.m ? 'selected' : ''}>${n}</option>`).join('')}</select>
         <select id="hg-y" style="width:auto">${yrs.map(y => `<option ${y === per.y ? 'selected' : ''}>${y}</option>`).join('')}</select>
         <input type="date" id="hg-f" value="${per.from}" style="width:auto"><span class="muted">al</span><input type="date" id="hg-t" value="${per.to}" style="width:auto">
-        ${isManager() ? `<select id="hg-k" style="width:auto"><option value="tecnico" ${flt === 'tecnico' ? 'selected' : ''}>Técnicos</option><option value="otros" ${flt === 'otros' ? 'selected' : ''}>Otros recursos y contratistas</option><option value="todos" ${flt === 'todos' ? 'selected' : ''}>Todos</option></select>` : ''}</div>
+        ${isManager() && !opt ? `<select id="hg-k" style="width:auto"><option value="tecnico" ${flt === 'tecnico' ? 'selected' : ''}>Técnicos</option><option value="otros" ${flt === 'otros' ? 'selected' : ''}>Otros recursos y contratistas</option><option value="todos" ${flt === 'todos' ? 'selected' : ''}>Todos</option></select>` : ''}</div>
       ${mgr ? `<div class="row" style="gap:6px"><button class="btn sec small" id="hg-fill">Cargar rango</button><button class="btn sec small" id="hg-hol">Feriados (${HHS.hol.size})</button><label class="btn sec small" style="cursor:pointer">Importar Excel<input type="file" id="hg-imp" accept=".xlsx,.xls" class="hidden"></label></div>` : ''}</div>
       <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${Object.entries(HH_CODES).map(([c, x]) => `<span class="pill" style="background:${x.bg};color:${x.c};border:1px solid var(--line)">${c} · ${x.n}</span>`).join('')}<span class="pill" style="background:#FFF8DB;color:#92400E">Sáb, dom y feriados</span></div>
       ${mgr ? '<p class="muted sm" style="margin:6px 0 0">Tocá una celda para cambiarla. Período de liquidación: del ' + Number(HHS.cfg.period_day) + ' al ' + (Number(HHS.cfg.period_day) - 1 || 'fin de mes') + ' (se cambia en Ajustes, o con las fechas de arriba).</p>' : ''}</div>
@@ -692,16 +699,16 @@ async function hhViewGuards(body, per){
       </tbody><tfoot><tr><td class="d"><b>Guardias</b></td>${cols.map(s => `<td><b>${days.filter(d => G.get(s.id + '|' + d)?.code === 'G').length}</b></td>`).join('')}</tr>
       <tr><td class="d">Fin de sem. / fer.</td>${cols.map(s => `<td>${days.filter(d => hhIsOff(d) && G.get(s.id + '|' + d)?.code === 'G').length}</td>`).join('')}</tr>
       <tr><td class="d">Sin dato</td>${cols.map(s => { const n = days.filter(d => !G.get(s.id + '|' + d)).length; return `<td style="${n ? 'color:var(--red);font-weight:600' : ''}">${n}</td>`; }).join('')}</tr></tfoot></table></div>`
-    : `<div class="card muted">${isManager() ? 'No hay técnicos cargados. Agregalos en Recursos o importá tu Excel de guardias.' : 'Tu usuario no está vinculado a un técnico.'}</div>`}`;
-  const setPer = (from, to, y, m) => { HHS.gper = { from, to, y, m }; hhViewGuards(body); };
+    : `<div class="card muted">${opt ? 'Este proyecto no tiene recursos asignados. Asignalos en 🏗 Equipo y vuelven acá.' : isManager() ? 'No hay técnicos cargados. Agregalos en Recursos o importá tu Excel de guardias.' : 'Tu usuario no está vinculado a un técnico.'}</div>`}`;
+  const setPer = (from, to, y, m) => { HHS.gper = { from, to, y, m }; hhViewGuards(body, null, opt); };
   $('#hg-m').onchange = $('#hg-y').onchange = () => { const y = Number($('#hg-y').value), m = Number($('#hg-m').value); const p = hhPeriod(y, m); setPer(p.from, p.to, y, m); };
   $('#hg-f').onchange = $('#hg-t').onchange = () => { const f = $('#hg-f').value, t = $('#hg-t').value; if (f && t && f <= t && hhDays(f, t).length <= 400) setPer(f, t, per.y, per.m); else toast('Rango inválido (hasta 400 días).'); };
-  $('#hg-k')?.addEventListener('change', e => { HHS.gflt = e.target.value; hhViewGuards(body); });
+  $('#hg-k')?.addEventListener('change', e => { HHS.gflt = e.target.value; hhViewGuards(body, null, opt); });
   if (!mgr) return;
-  body.querySelectorAll('td.c').forEach(td => td.onclick = () => hhGuardCell(HHS.staff.find(s => s.id === td.dataset.gs), td.dataset.gd, G.get(td.dataset.gs + '|' + td.dataset.gd), per, () => hhViewGuards(body)));
-  $('#hg-fill').onclick = () => hhGuardCell(null, per.from, null, per, () => hhViewGuards(body), true);
-  $('#hg-hol').onclick = () => hhHolidays(() => hhViewGuards(body));
-  $('#hg-imp').onchange = e => hhImportGuards(e.target.files[0], () => hhViewGuards(body));
+  body.querySelectorAll('td.c').forEach(td => td.onclick = () => hhGuardCell(HHS.staff.find(s => s.id === td.dataset.gs), td.dataset.gd, G.get(td.dataset.gs + '|' + td.dataset.gd), per, () => hhViewGuards(body, null, opt)));
+  $('#hg-fill').onclick = () => hhGuardCell(null, per.from, null, per, () => hhViewGuards(body, null, opt), true);
+  $('#hg-hol').onclick = () => hhHolidays(() => hhViewGuards(body, null, opt));
+  $('#hg-imp').onchange = e => hhImportGuards(e.target.files[0], () => hhViewGuards(body, null, opt), opt);
 }
 function hhGuardCell(st, day, cur, per, after, range){
   if (!needOnline()) return;
@@ -752,7 +759,7 @@ function hhCodeOf(v){
   if (/sin guardia/.test(s)) return '-';
   return null;
 }
-async function hhImportGuards(file, after){
+async function hhImportGuards(file, after, opt){
   if (!file || !needOnline()) return;
   let wb; try { wb = await readWorkbook(file); } catch (x){ return toast('Excel: ' + errText(x)); }
   const sn = wb.SheetNames.find(n => /fechas? de guardia/i.test(n)) || wb.SheetNames[0];
@@ -787,11 +794,13 @@ async function hhImportGuards(file, after){
   const fsn = wb.SheetNames.find(n => /^feriados$/i.test(norm(n)));
   const hols = []; if (fsn) for (const r of sheetRows(wb.Sheets[fsn])){ const d = xlDate(r[0]); if (d) hols.push({ day: d, name: String(r[1] || 'Feriado').slice(0, 120), kind: String(r[2] || '').slice(0, 40) || null }); }
   const total = [...grid.values()].reduce((a, mm) => a + mm.size, 0);
-  const summary = [...groups.entries()].map(([k, hs]) => { const r = rep.get(k); const ex = HHS.staff.find(s => hhNormName(s.name) === k || hhNormName(s.grid_name) === k || (r && hhNormName(s.name) === hhNormName(r.name)));
+  let summary = [...groups.entries()].map(([k, hs]) => { const r = rep.get(k); const ex = HHS.staff.find(s => hhNormName(s.name) === k || hhNormName(s.grid_name) === k || (r && hhNormName(s.name) === hhNormName(r.name)));
     return { k, hs, display: r?.name || hhPretty(hs[0].name), grid_name: hs[0].name, exists: ex, kind: r ? 'tecnico' : 'recurso', liquidate: !!(r && r.incl), base: hs[0].base >= 0 ? base(hs[0].base) : null, contract: hs[0].contr >= 0 ? base(hs[0].contr) : null, days: grid.get(k).size }; });
-  const m = modal(`<h2>Importar guardias</h2><p class="muted sm">Solapa "${esc(sn)}" · ${total} días con dato · ${hols.length} feriados</p>
+  const omit = []; if (opt){ summary = summary.filter(s => s.exists && opt.ids.has(s.exists.id) ? true : (omit.push(s.display), false)); if (!summary.length) return toast('Ninguna de las personas del Excel está asignada a este proyecto. Asignalas primero en 🏗 Equipo.'); }
+  const m = modal(`<h2>Importar guardias${opt ? ' · ' + esc(opt.name) : ''}</h2><p class="muted sm">Solapa "${esc(sn)}" · ${total} días con dato · ${hols.length} feriados</p>
     <div class="tblwrap" style="max-height:44vh;overflow:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Tipo</th><th class="num">Días</th><th>Estado</th></tr></thead><tbody>
     ${summary.map((s, i) => `<tr><td>${esc(s.display)}${s.hs.length > 1 ? '<div class="sm muted">' + s.hs.length + ' columnas unificadas</div>' : ''}</td><td><select data-ik="${i}" style="width:auto;padding:4px">${Object.entries(HH_SK).map(([k, n]) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${n}</option>`).join('')}</select></td><td class="num">${s.days}</td><td class="sm">${s.exists ? 'ya existe' : 'nuevo'}${s.liquidate ? ' · liquida' : ''}</td></tr>`).join('')}</tbody></table></div>
+    ${omit.length ? `<p class="sm" style="color:#B45309">No se importan (no están asignadas a este proyecto): ${esc(omit.join(', '))}.</p>` : ''}
     <p class="sm">Correcciones: ${fixes.serie} días con trazas mal arrastradas (T25, T26…) vuelven al valor original · vacaciones escritas de distintas formas quedan como VAC.</p>
     <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="ig-o" checked style="width:auto"> Reemplazar los días que ya estén cargados</label>
     <div class="err" id="ig-e"></div>
@@ -804,10 +813,10 @@ async function hhImportGuards(file, after){
       for (const s of summary){
         if (!s.exists){ const { data, error } = await sb.from('hh_staff').insert({ name: s.display, grid_name: s.grid_name, kind: s.kind, active: true, liquidate: s.liquidate && s.kind === 'tecnico', base: s.base, contract: s.contract, sort: rep.get(s.k) ? 10 + rep.get(s.k).idx : 200 + summary.indexOf(s) }).select('id').single(); if (error) throw error; s.id = data.id; }
         else { s.id = s.exists.id; const upd = { grid_name: s.grid_name }, rp = rep.get(s.k);
-          if (rp){ upd.kind = s.kind; upd.liquidate = rp.incl && s.kind === 'tecnico'; upd.active = true; upd.sort = 10 + rp.idx; }   // la solapa TECNICOS manda: quién se liquida y en qué orden
+          if (rp && !opt){ upd.kind = s.kind; upd.liquidate = rp.incl && s.kind === 'tecnico'; upd.active = true; upd.sort = 10 + rp.idx; }   // la solapa TECNICOS manda: quién se liquida y en qué orden
           await sb.from('hh_staff').update(upd).eq('id', s.id); }
       }
-      if (hols.length){ for (let i = 0; i < hols.length; i += 500){ const { error } = await sb.from('hh_holidays').upsert(hols.slice(i, i + 500), { onConflict: 'org_id,day' }); if (error) throw error; } }
+      if (hols.length && !opt){ for (let i = 0; i < hols.length; i += 500){ const { error } = await sb.from('hh_holidays').upsert(hols.slice(i, i + 500), { onConflict: 'org_id,day' }); if (error) throw error; } }
       const all = []; for (const s of summary) for (const [d, x] of grid.get(s.k)) all.push({ staff_id: s.id, day: d, code: x.code, note: x.note });
       for (let i = 0; i < all.length; i += 500){
         btn.textContent = `Guardando ${Math.min(i + 500, all.length)} de ${all.length}…`;
@@ -817,6 +826,79 @@ async function hhImportGuards(file, after){
       m.close(); await hhDrop('hh-staff', 'hh-hol'); await hhLoadBase(); HHS.gper = null; toast(`Importado: ${summary.length} personas, ${all.length} días, ${hols.length} feriados`); after();
     } catch (x){ $('#ig-ok').disabled = false; btn.textContent = 'Reintentar'; $('#ig-e').textContent = errText(x); }
   };
+}
+
+
+/* =====================================================================
+   📆 CALENDARIO DEL PROYECTO: recursos asignados (🏗 Equipo) + guardias de ese proyecto
+   ===================================================================== */
+async function hhProjCal(body, p, tasks){
+  if (!isManager()){ body.innerHTML = '<div class="card muted">El calendario del proyecto es para coordinadores.</div>'; return; }
+  await hhLoadBase();
+  let ps = []; try { const r = await sb.from('project_staff').select('staff_id,status,date_from,date_to,scopes').eq('project_id', p.id); if (r.error) throw r.error; ps = r.data || []; }
+  catch (e){ body.innerHTML = `<div class="card"><b>No se pudo leer el equipo del proyecto</b><p class="muted">${esc(errText(e))}</p></div>`; return; }
+  const today = todayStr();
+  const act = ps.filter(x => x.status !== 'finalizada' && (!x.date_to || x.date_to >= today));
+  const ids = new Set(act.map(x => x.staff_id).filter(id => HHS.staff.some(s => s.id === id && s.active)));
+  const people = HHS.staff.filter(s => ids.has(s.id));
+  const opt = { pid: p.id, name: p.name, ids };
+  const cp = hhCurPeriod(); const per = HHS.gper || { ...hhPeriod(cp.y, cp.m), y: cp.y, m: cp.m };
+  const tom = addDays(today, 1);
+  let gnow = []; if (ids.size){ try { gnow = await hhItems(sb.from('hh_guard').select('staff_id,day,code,note').gte('day', today).lte('day', tom).eq('code', 'G').limit(500)); } catch {} }
+  const nm = id => HHS.staff.find(s => s.id === id);
+  const who = day => gnow.filter(g => g.day === day && ids.has(g.staff_id)).map(g => nm(g.staff_id)).filter(Boolean);
+  const chip = s => { const wa = s.phone && typeof waPhone === 'function' ? waPhone(s.phone) : ''; return `<span class="pill" style="background:#DCFCE7;color:#166534">${esc(hhPretty(s.name))}${wa ? ` <a href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" title="WhatsApp" style="text-decoration:none">💬</a>` : ''}</span>`; };
+  const line = (lbl, arr) => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><b style="min-width:62px">${lbl}</b>${arr.length ? arr.map(chip).join('') : '<span class="muted sm">nadie cargado</span>'}</div>`;
+  body.innerHTML = `
+    <div class="card"><div class="row between" style="gap:10px;flex-wrap:wrap"><div><h2 style="margin:0">📆 Calendario de ${esc(p.name)}</h2>
+        <div class="muted sm">${people.length} recurso${people.length === 1 ? '' : 's'} afectado${people.length === 1 ? '' : 's'} al proyecto · el calendario general (Agenda) sigue mostrando todos los proyectos.</div></div>
+      <a class="btn sec small" href="#/recursos/p/${esc(p.id)}">🏗 Asignar recursos (Equipo)</a></div>
+      <div style="margin-top:10px;display:grid;gap:6px">${line('Hoy', who(today))}${line('Mañana', who(tom))}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><span class="muted sm">Recursos del proyecto:</span>${people.length ? people.map(s => `<span class="pill" style="background:var(--bg2,#F1F5F9)">${esc(hhPretty(s.name))}<span class="muted"> · ${esc(HH_SK[s.kind] || '')}</span></span>`).join('') : '<span class="muted sm">Ninguno todavía. Asignalos en 🏗 Equipo.</span>'}</div></div>
+    <div id="pc-grid"></div><div id="pc-sum"></div><div id="pc-tk"></div>`;
+  await hhViewGuards($('#pc-grid'), per, opt);
+  const sumBox = $('#pc-sum');
+  try {
+    const D = await hhReportData(per.from, per.to); D.rows = D.rows.filter(r => ids.has(r.s.id));
+    const used = D.rows.filter(r => r.nodata < D.days.length);
+    sumBox.innerHTML = `<div class="card"><div class="row between" style="gap:10px;flex-wrap:wrap"><div><h2 style="margin:0">Resumen de guardias del proyecto</h2><div class="muted sm">Período ${esc(fmtD(per.from))} al ${esc(fmtD(per.to))} · solo técnicos que liquidan</div></div>
+      <button class="btn small" id="pc-xl">⬇ Bajar Excel (grilla + resumen)</button></div>
+      ${used.length ? `<div class="tblwrap" style="margin-top:8px"><table class="tbl"><thead><tr><th>Técnico</th><th class="num">Días de guardia</th><th class="num">Fines de semana / feriados</th></tr></thead><tbody>${used.map(r => `<tr><td>${esc(r.s.name)}</td><td class="num"><b>${r.gd}</b></td><td class="num"><b>${r.gw}</b></td></tr>`).join('')}<tr><td><b>Total</b></td><td class="num"><b>${used.reduce((a, r) => a + r.gd, 0)}</b></td><td class="num"><b>${used.reduce((a, r) => a + r.gw, 0)}</b></td></tr></tbody></table></div>`
+        : '<p class="muted sm" style="margin:8px 0 0">Ningún técnico del proyecto tiene guardias cargadas en este período.</p>'}
+      <p class="muted sm" style="margin:6px 0 0">Quien está en más de un proyecto aparece en cada uno; el informe del día 16 para RRHH cuenta a cada persona una sola vez.</p></div>`;
+    $('#pc-xl').onclick = async () => { const b = $('#pc-xl'); b.disabled = true; try { await hhExportProjCal(p, per, people, D); } catch (e){ toast(errText(e)); } b.disabled = false; };
+  } catch (e){ sumBox.innerHTML = `<div class="card muted">No se pudo armar el resumen: ${esc(errText(e))}</div>`; }
+  const tk = (tasks || []).filter(t => t.project_id === p.id && t.status !== 'cerrada' && t.due_date && t.due_date >= per.from && t.due_date <= per.to).sort((a, b) => a.due_date < b.due_date ? -1 : 1).slice(0, 40);
+  $('#pc-tk').innerHTML = tk.length ? `<div class="card"><h2 style="margin:0 0 6px">Tareas con vencimiento en el período (${tk.length})</h2>${tk.map(t => `<div class="row between" style="padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(fmtD(t.due_date))} · ${esc(t.title || t.name || 'Tarea')}</span><span class="muted sm">${esc(t.status || '')}</span></div>`).join('')}</div>` : '';
+}
+async function hhExportProjCal(p, per, people, D){
+  await hhLoadExcelJS();
+  const days = hhDays(per.from, per.to);
+  const G = new Map((await hhItems(sb.from('hh_guard').select('staff_id,day,code,note').gte('day', per.from).lte('day', per.to).limit(20000))).map(r => [r.staff_id + '|' + r.day, r]));
+  const wb = new ExcelJS.Workbook(); wb.creator = 'InspectApp'; wb.created = new Date();
+  const ws = wb.addWorksheet('fechas de guardia', { views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }] });
+  const th = { style: 'thin', color: { argb: 'FFBFBFBF' } }, bd = { top: th, bottom: th, left: th, right: th };
+  const TXT = { G: 'DE GUARDIA', F: 'FRANCO', VAC: 'VAC', LIC: 'LICENCIA', '-': 'SIN GUARDIA' };
+  ws.getCell(1, 2).value = hhX(`${p.name} · guardias del ${fmtD(per.from)} al ${fmtD(per.to)}`); ws.getCell(1, 2).font = { bold: true, size: 13 };
+  ws.getColumn(1).width = 16; ws.getColumn(2).width = 12;
+  ws.getCell(3, 1).value = 'DIA X PERIODO'; ws.getCell(3, 2).value = 'FECHA'; [1, 2].forEach(c => { ws.getCell(3, c).font = { bold: true }; ws.getCell(3, c).border = bd; });
+  people.forEach((s, k) => { const j = 3 + k * 3;
+    ws.getCell(2, j).value = hhX(s.grid_name || s.name); ws.getCell(2, j).font = { bold: true };
+    ws.getCell(3, j).value = 'DIA DE GUARDIA'; ws.getCell(3, j + 1).value = 'Base'; ws.getCell(3, j + 2).value = 'Contrato';
+    [j, j + 1, j + 2].forEach(c => { ws.getCell(3, c).font = { bold: true }; ws.getCell(3, c).border = bd; ws.getCell(3, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; });
+    ws.getColumn(j).width = 24; ws.getColumn(j + 1).width = 10; ws.getColumn(j + 2).width = 10; });
+  days.forEach((d, i) => { const r = 4 + i, off = hhIsOff(d), yel = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    ws.getCell(r, 1).value = d === per.from ? 'DIA 1 PERIODO' : ''; ws.getCell(r, 2).value = hhSerial(d); ws.getCell(r, 2).numFmt = 'dd/mm/yyyy';
+    people.forEach((s, k) => { const j = 3 + k * 3, g = G.get(s.id + '|' + d); const c = ws.getCell(r, j);
+      if (g){ c.value = TXT[g.code] + (g.code === 'G' && g.note ? ' ' + g.note : ''); if (!off && HH_CODES[g.code]) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HH_CODES[g.code].x } }; }
+      c.border = bd; });
+    if (off) for (let c = 1; c <= 2 + people.length * 3; c++) ws.getCell(r, c).fill = yel;
+    ws.getCell(r, 1).border = bd; ws.getCell(r, 2).border = bd; });
+  const wf = wb.addWorksheet('FERIADOS'); wf.addRow(['Fecha', 'Nombre', 'Tipo']); wf.getRow(1).font = { bold: true }; wf.getColumn(1).width = 14; wf.getColumn(2).width = 48; wf.getColumn(3).width = 16;
+  [...HHS.hol.values()].sort((a, b) => a.day < b.day ? -1 : 1).forEach(h => { const r = wf.addRow([hhSerial(h.day), hhX(h.name || 'Feriado'), hhX(h.kind || '')]); r.getCell(1).numFmt = 'dd/mm/yyyy'; });
+  const mm = String(per.m).padStart(2, '0');
+  hhResumenSheet(wb, D, { y: per.y, m: per.m }, `RESUMEN ${mm} ${String(per.y).slice(2)}`);
+  hhDownloadWb(await wb.xlsx.writeBuffer(), `Guardias ${p.name} - ${HH_MONTHS[per.m - 1]} ${per.y}.xlsx`);
 }
 
 /* =====================================================================
