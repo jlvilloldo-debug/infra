@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>InspectApp · Transformándonos</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-u11wrhliGybx9u3Gxgd0ivvvCQhzLp5rIOejZ72sLYw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://iaysoqqzdwkmsgixqbub.supabase.co https://*.tile.openstreetmap.org; connect-src 'self' https://iaysoqqzdwkmsgixqbub.supabase.co wss://iaysoqqzdwkmsgixqbub.supabase.co https://api.open-meteo.com; media-src 'self' blob: https://iaysoqqzdwkmsgixqbub.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-sISzD/qED8+US54RRlTV7CgRQZgEdPnj+AF99z5zjdA='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://iaysoqqzdwkmsgixqbub.supabase.co https://*.tile.openstreetmap.org; connect-src 'self' https://iaysoqqzdwkmsgixqbub.supabase.co wss://iaysoqqzdwkmsgixqbub.supabase.co https://api.open-meteo.com; media-src 'self' blob: https://iaysoqqzdwkmsgixqbub.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#0F2A4A">
 <meta name="mobile-web-app-capable" content="yes">
@@ -464,11 +464,11 @@ if (window.top !== window.self){ try { window.top.location = window.self.locatio
 const SUPABASE_URL = 'https://iaysoqqzdwkmsgixqbub.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_WmRavCR6O6jEpJiUfGl0mA_9tzkdwDH';
 const AUTH_STORAGE_KEY = 'sb-iaysoqqzdwkmsgixqbub-auth-token';
-const APP_VERSION = '5.31.0';
+const APP_VERSION = '5.32.0';
 /* Módulos y librerías que se cargan recién cuando hacen falta (la app arranca más liviana).
    Solo archivos propios de la app (misma dirección): la política de seguridad no deja cargar de otros sitios. */
-const LIBS = { xlsx: 'xlsx.full.min.js', jszip: 'jszip.min.js', jsqr: 'jsQR.js', qr: 'qrcode.js', donde: 'donde.js', control: 'control.js', stock: 'stock.js', sitios: 'sitios.js', hys: ['hys_data.js', 'hys.js'], agenda: 'agenda.js', recursos: 'recursos.js', red: 'red.js', gab: 'gabinete.js', fix: 'correcciones.js', bases: 'bases.js', instr: 'instrumental.js', help: 'help.js', tplpdf: 'tplpdf.js', pdfjs: 'pdf.min.js', dc: ['qrcode.js', 'datacenter.js'] };
-const LIB_OK = { xlsx: () => typeof XLSX !== 'undefined', jszip: () => typeof JSZip !== 'undefined', jsqr: () => typeof jsQR === 'function', qr: () => typeof qrcode === 'function', donde: () => typeof viewDonde === 'function', control: () => typeof viewControl === 'function', stock: () => typeof viewStock === 'function', sitios: () => typeof viewSite === 'function', hys: () => typeof viewHys === 'function' && typeof HYS_JOBS !== 'undefined', agenda: () => typeof viewAgenda === 'function', recursos: () => typeof viewRecursos === 'function', red: () => typeof viewRed === 'function', gab: () => typeof gabOpen === 'function', fix: () => typeof fixDecorate === 'function', bases: () => typeof viewBases === 'function', instr: () => typeof viewInstr === 'function', help: () => typeof viewHelp === 'function', tplpdf: () => typeof importTemplatePdf === 'function', pdfjs: () => typeof pdfjsLib !== 'undefined', dc: () => typeof viewDC === 'function' };
+const LIBS = { xlsx: 'xlsx.full.min.js', jszip: 'jszip.min.js', jsqr: 'jsQR.js', qr: 'qrcode.js', donde: 'donde.js', control: 'control.js', stock: 'stock.js', sitios: 'sitios.js', hys: ['hys_data.js', 'hys.js'], agenda: 'agenda.js', recursos: 'recursos.js', red: 'red.js', gab: 'gabinete.js', fix: 'correcciones.js', bases: 'bases.js', instr: 'instrumental.js', help: 'help.js', arc: 'archivo.js', tplpdf: 'tplpdf.js', pdfjs: 'pdf.min.js', dc: ['qrcode.js', 'datacenter.js'] };
+const LIB_OK = { xlsx: () => typeof XLSX !== 'undefined', jszip: () => typeof JSZip !== 'undefined', jsqr: () => typeof jsQR === 'function', qr: () => typeof qrcode === 'function', donde: () => typeof viewDonde === 'function', control: () => typeof viewControl === 'function', stock: () => typeof viewStock === 'function', sitios: () => typeof viewSite === 'function', hys: () => typeof viewHys === 'function' && typeof HYS_JOBS !== 'undefined', agenda: () => typeof viewAgenda === 'function', recursos: () => typeof viewRecursos === 'function', red: () => typeof viewRed === 'function', gab: () => typeof gabOpen === 'function', fix: () => typeof fixDecorate === 'function', bases: () => typeof viewBases === 'function', instr: () => typeof viewInstr === 'function', help: () => typeof viewHelp === 'function', arc: () => typeof arcOpen === 'function', tplpdf: () => typeof importTemplatePdf === 'function', pdfjs: () => typeof pdfjsLib !== 'undefined', dc: () => typeof viewDC === 'function' };
 const _libP = {};
 function needLib(k){
   if (!LIBS[k]) return Promise.reject(new Error('Módulo desconocido'));
@@ -3989,6 +3989,7 @@ async function viewOrg(v){
     ${isManager() ? `<a class="card row between" href="#/recursos" style="text-decoration:none;color:inherit;border-left:5px solid var(--s1)"><div><h2 style="margin:0">👥 Recursos</h2><div class="muted sm">Organigrama, personal propio y contratistas, en qué proyectos está cada uno. Alta de personas y carga por Excel.</div></div><span class="btn" style="margin:0">Abrir</span></a>` : ''}
     ${permCanManage() ? `<div class="card row between"><div><h2 style="margin:0">🔐 Permisos por módulo</h2><div class="muted sm">Qué ve y qué puede cargar cada perfil o persona${adm ? ', y qué coordinador te ayuda a manejarlos' : ''}.</div></div><a class="btn sec" href="#/perms">Abrir</a></div>` : ''}
     ${isManager() ? '<div id="org-ext"></div>' : ''}
+    ${adm ? `<div class="card row between" style="gap:10px"><div><h2 style="margin:0">📦 Archivar fotos</h2><div class="muted sm">Libera espacio en Supabase: baja las fotos viejas a tu computadora (ZIP) y recién después las reemplaza por "Foto archivada".</div></div><button class="btn sec" id="arc-open">Abrir</button></div>` : ''}
     ${adm ? `<div class="card"><h2>Datos de la empresa</h2><div class="row"><input id="o-name" class="grow" value="${esc(org?.name || '')}"><button class="btn sec" id="o-save">Guardar nombre</button></div></div>
     <div class="card"><h2>Sumar usuarios</h2>
       <p class="muted" style="margin-top:0">Pasale este código a cada persona de tu equipo. Al crear su cuenta elige “Tengo un código” y lo ingresa.</p>
@@ -4010,6 +4011,7 @@ async function viewOrg(v){
       <div id="mfa-body" class="muted sm">Cargando…</div></div>`;
   mfaCard($('#mfa-body'));
   if ($('#org-ext')) empOrgSection($('#org-ext')).catch(e => console.error(e));
+  $('#arc-open')?.addEventListener('click', async () => { try { await needLib('arc'); arcOpen(); } catch (e){ toast(errText(e)); } });
   $('#o-save')?.addEventListener('click', async () => {
     const name = $('#o-name').value.trim(); if (!name) return;
     const { error } = await sb.from('organizations').update({ name }).eq('id', me.org_id);
